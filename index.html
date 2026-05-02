@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tic Tac Toe AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom animations and styling */
+    .cell-pop {
+      animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .winning-cell {
+      background-color: #10b981 !important; /* Emerald 500 */
+      color: white !important;
+      transform: scale(1.05);
+      transition: all 0.3s ease;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center justify-center font-sans">
+
+  <div class="max-w-md w-full px-4 flex flex-col items-center">
+    <h1 class="text-4xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-pink-500">
+      Tic Tac Toe
+    </h1>
+    <p class="text-gray-400 mb-6 text-sm">You vs Computer &copy; JD</p>
+
+    <!-- Game Settings -->
+    <div class="w-full bg-gray-800 p-4 rounded-xl shadow-lg mb-6 flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <label for="playerName" class="text-sm text-gray-300 font-medium">Player Name:</label>
+        <input type="text" id="playerName" value="Player" 
+               class="bg-gray-700 text-white px-3 py-1 rounded-md outline-none focus:ring-2 focus:ring-orange-500 text-right w-1/2">
+      </div>
+      <div class="flex items-center justify-between">
+        <label for="difficulty" class="text-sm text-gray-300 font-medium">AI Difficulty:</label>
+        <select id="difficulty" class="bg-gray-700 text-white px-3 py-1 rounded-md outline-none focus:ring-2 focus:ring-orange-500 w-1/2 cursor-pointer">
+          <option value="easy">Easy (Random)</option>
+          <option value="medium" selected>Medium (80% Smart)</option>
+          <option value="hard">Impossible (Minimax)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Game Status -->
+    <div id="status" class="text-xl font-semibold mb-4 min-h-[32px] text-center text-orange-400">
+      Player's Turn (X)
+    </div>
+
+    <!-- Game Board -->
+    <div class="grid grid-cols-3 gap-2 bg-gray-700 p-3 rounded-2xl shadow-2xl w-full aspect-square max-w-[350px]">
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(0)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(1)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(2)"></button>
+      
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(3)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(4)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(5)"></button>
+      
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(6)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(7)"></button>
+      <button class="cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors" onclick="playerMove(8)"></button>
+    </div>
+
+    <!-- Controls -->
+    <button onclick="resetGame()" class="mt-8 px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-400 hover:to-pink-400 text-white font-bold rounded-full shadow-lg transform transition active:scale-95">
+      Restart Game
+    </button>
+  </div>
+
+  <script>
+    let board = ["", "", "", "", "", "", "", "", ""];
+    let gameOver = false;
+    let isComputerThinking = false;
+
+    const cells = document.querySelectorAll(".cell");
+    const statusDiv = document.getElementById("status");
+    const nameInput = document.getElementById("playerName");
+    const difficultySelect = document.getElementById("difficulty");
+
+    const winPatterns = [
+      [0,1,2], [3,4,5], [6,7,8], // Rows
+      [0,3,6], [1,4,7], [2,5,8], // Cols
+      [0,4,8], [2,4,6]           // Diagonals
+    ];
+
+    // Initialize display
+    updateStatus();
+
+    // Listen to name changes to update status dynamically
+    nameInput.addEventListener('input', () => {
+      if (!gameOver && !isComputerThinking) {
+        updateStatus();
+      }
+    });
+
+    function getPlayerName() {
+      return nameInput.value.trim() || "Player";
+    }
+
+    function updateStatus(message) {
+      if (message) {
+        statusDiv.innerHTML = message;
+      } else {
+        statusDiv.innerText = `${getPlayerName()}'s Turn (X)`;
+      }
+    }
+
+    function renderBoard() {
+      board.forEach((val, index) => {
+        const cell = cells[index];
+        if (cell.innerText !== val) {
+          cell.innerText = val;
+          if (val !== "") {
+            cell.classList.add("cell-pop");
+            cell.classList.replace(val === "X" ? "text-pink-400" : "text-orange-400", val === "X" ? "text-orange-400" : "text-pink-400");
+          }
+        }
+      });
+    }
+
+    function playerMove(index) {
+      if (board[index] !== "" || gameOver || isComputerThinking) return;
+
+      // Player X move
+      board[index] = "X";
+      renderBoard();
+
+      if (handleWinOrDraw("X")) return;
+
+      // Trigger Computer Move
+      isComputerThinking = true;
+      updateStatus(`<span class="text-gray-400">Computer is thinking...</span>`);
+      
+      // Artificial delay for better UX
+      setTimeout(() => {
+        computerMove();
+        isComputerThinking = false;
+      }, 500);
+    }
+
+    function computerMove() {
+      if (gameOver) return;
+
+      const difficulty = difficultySelect.value;
+      let move;
+      let randomChance = Math.random();
+
+      // Easy: 100% Random | Medium: 20% Random | Hard: 0% Random
+      let playRandomly = false;
+      if (difficulty === "easy") playRandomly = true;
+      if (difficulty === "medium" && randomChance < 0.2) playRandomly = true;
+
+      if (playRandomly) {
+        // Random Move
+        let emptyCells = board.map((val, i) => val === "" ? i : null).filter(v => v !== null);
+        move = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+      } else {
+        // Best Move (Minimax)
+        let bestScore = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (board[i] === "") {
+            board[i] = "O";
+            let score = minimax(board, 0, false);
+            board[i] = ""; // Undo move
+            if (score > bestScore) {
+              bestScore = score;
+              move = i;
+            }
+          }
+        }
+      }
+
+      // Apply computer move
+      board[move] = "O";
+      renderBoard();
+      
+      if (!handleWinOrDraw("O")) {
+        updateStatus(); // Back to player
+      }
+    }
+
+    // Minimax algorithm for unbeatable AI
+    function minimax(testBoard, depth, isMaximizing) {
+      if (checkWin(testBoard, "O")) return 10 - depth;
+      if (checkWin(testBoard, "X")) return depth - 10;
+      if (testBoard.every(cell => cell !== "")) return 0;
+
+      if (isMaximizing) {
+        let bestScore = -Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (testBoard[i] === "") {
+            testBoard[i] = "O";
+            let score = minimax(testBoard, depth + 1, false);
+            testBoard[i] = "";
+            bestScore = Math.max(score, bestScore);
+          }
+        }
+        return bestScore;
+      } else {
+        let bestScore = Infinity;
+        for (let i = 0; i < 9; i++) {
+          if (testBoard[i] === "") {
+            testBoard[i] = "X";
+            let score = minimax(testBoard, depth + 1, true);
+            testBoard[i] = "";
+            bestScore = Math.min(score, bestScore);
+          }
+        }
+        return bestScore;
+      }
+    }
+
+    function checkWin(boardState, player) {
+      return winPatterns.some(pattern =>
+        pattern.every(index => boardState[index] === player)
+      );
+    }
+
+    // Handles highlighting the board and setting status
+    function handleWinOrDraw(player) {
+      const winningPattern = winPatterns.find(pattern =>
+        pattern.every(index => board[index] === player)
+      );
+
+      if (winningPattern) {
+        winningPattern.forEach(index => {
+          cells[index].classList.add("winning-cell");
+        });
+        
+        if (player === "X") {
+          updateStatus(`🎉 Congratulations, ${getPlayerName()} won! 🎉`);
+        } else {
+          updateStatus("💻 Computer Wins!");
+        }
+        gameOver = true;
+        return true;
+      }
+
+      if (board.every(cell => cell !== "")) {
+        updateStatus("🤝 It's a Draw!");
+        gameOver = true;
+        return true;
+      }
+
+      return false;
+    }
+
+    function resetGame() {
+      board = ["", "", "", "", "", "", "", "", ""];
+      gameOver = false;
+      isComputerThinking = false;
+      
+      cells.forEach(cell => {
+        cell.innerText = "";
+        cell.className = "cell w-full h-full bg-gray-800 rounded-xl text-5xl font-bold flex items-center justify-center hover:bg-gray-600 transition-colors";
+      });
+      
+      updateStatus();
+    }
+  </script>
+</body>
+</html>
